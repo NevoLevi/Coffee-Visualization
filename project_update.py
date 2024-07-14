@@ -8,11 +8,7 @@ import io
 import numpy as np
 from typing import Tuple, List, Optional
 from streamlit_plotly_events import plotly_events
-
-
 from plotly.subplots import make_subplots
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.neighbors import NearestNeighbors
 
 
 # Data loading and preprocessing
