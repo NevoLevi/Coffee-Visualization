@@ -608,9 +608,7 @@ def create_coffee_type_map(coffee_data: pd.DataFrame, world: gpd.GeoDataFrame) -
     coffee_data = world[['name']].merge(coffee_data, how='left', left_on='name', right_on='Country').fillna('No data')
 
     # Convert total domestic consumption to billions and format as string
-    coffee_data['Total Domestic Consumption'] = coffee_data['Total Domestic Consumption'].apply(
-        lambda x: f"{x / 1e9:.1f}B" if x != 'No data' else 'No data'
-    )
+    coffee_data['Total Domestic Consumption'] = coffee_data['Total Domestic Consumption'].apply(format_value)
 
     fig = px.choropleth(
         coffee_data,
