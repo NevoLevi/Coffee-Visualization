@@ -404,8 +404,8 @@ def subheader_with_tooltip(header_text: str, tooltip_text: str) -> None:
 
 
 def create_top_consumers_line_chart(importers_consumption: pd.DataFrame) -> go.Figure:
-    """Create a line chart showing consumption trends for top 10 importing countries."""
-    # Select top 10 countries based on total import consumption
+    """Create a line chart showing consumption trends for top 7 importing countries."""
+    # Select top 7 countries based on total import consumption
     top_countries = importers_consumption.nlargest(7, 'Total_import_consumption')
 
     # Prepare the data for plotting
@@ -506,7 +506,7 @@ def create_reexport_proportion_chart(coffee_import: pd.DataFrame, re_export: pd.
     df['Year'] = pd.to_numeric(df['Year'])
     df['Re-export Proportion'] = df['Re-exports'] / df['Imports']
 
-    # Select top 10 countries by total trade volume
+    # Select top 8 countries by total trade volume
     top_countries = df.groupby('Country')[['Imports', 'Re-exports']].sum().sum(axis=1).nlargest(8).index
     df_filtered = df[df['Country'].isin(top_countries)]
 
@@ -907,8 +907,8 @@ def main():
 
         with col5:
             subheader_with_tooltip(
-                "Coffee Consumption Trends for Top 10 Importing Countries",
-                "This line chart shows consumption trends over time for the top 10 coffee-importing countries. It allows for easy comparison of consumption patterns and growth rates among major coffee consumers."
+                "Coffee Consumption Trends for Top 7 Importing Countries",
+                "This line chart shows consumption trends over time for the top 7 coffee-importing countries. It allows for easy comparison of consumption patterns and growth rates among major coffee consumers."
             )
             fig_top_consumers = create_top_consumers_line_chart(importers_consumption)
             st.plotly_chart(fig_top_consumers, use_container_width=True)
