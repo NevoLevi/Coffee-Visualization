@@ -422,9 +422,9 @@ def create_top_consumers_line_chart(importers_consumption: pd.DataFrame) -> go.F
 
     # Customize x-axis to show every 5 years
     fig.update_layout(
-        title='Coffee Import Consumption Trends for Top 7 Importing Countries',
+        title='Coffee Consumption Trends for Top 7 Importing Countries',
         xaxis_title='Year',
-        yaxis_title='Import Consumption (60kg bags)',
+        yaxis_title='Consumption (60kg bags)',
         xaxis=dict(
             tickmode='array',
             tickvals=[year for year in years if int(year) % 5 == 0],  # Show every 5 years
@@ -569,12 +569,11 @@ def create_consumption_production_trend_psd(psd_coffee: pd.DataFrame) -> go.Figu
     fig.add_trace(go.Scatter(x=df['Year'], y=df['Domestic Consumption'], name='Global Consumption'),
                   secondary_y=False)
     fig.add_trace(go.Scatter(x=df['Year'], y=df['Total Production'], name='Global Production'),
-                  secondary_y=True)
+                  secondary_y=False)
 
     fig.update_layout(title='Global Coffee Consumption and Production Trends',
                       xaxis_title='Year')
-    fig.update_yaxes(title_text="Global Consumption (60kg bags)", secondary_y=False)
-    fig.update_yaxes(title_text="Global Production (60kg bags)", secondary_y=True)
+    fig.update_yaxes(title_text="Coffee (60kg bags)", secondary_y=False)
 
     return fig
 
@@ -800,7 +799,9 @@ def main():
         # Add a tooltip to the map section
         subheader_with_tooltip(
             "Interactive Coffee Trading Map",
-            "This interactive choropleth map displays aggregated coffee trading data for selected years. Click on a country to view its details. To reset the map to its initial state,  click again on the last selected country, or adjust the year range slider."
+            "This interactive map displays coffee trading data for selected years. "
+            "Trading is Exports + Imports of the country. Click on a country to view its details. "
+            "To reset the map to its initial state,  click again on the last selected country, or adjust the year range slider."
         )
 
         # Initialize the session state for selected country
