@@ -694,6 +694,75 @@ def create_coffee_type_map(coffee_data: pd.DataFrame, world: gpd.GeoDataFrame) -
     return fig
 
 
+def create_reexport_vs_domestic_chart(coffee_import: pd.DataFrame, re_export: pd.DataFrame, importers_consumption: pd.DataFrame) -> go.Figure:
+    """Create a bar chart showing the proportion of re-exports vs domestic consumption for top importing countries in 2019."""
+
+    # Filter for the year 2019
+    imports_2019 = coffee_import[['Country', '2019']].rename(columns={'2019': 'Imports_2019'})
+    reexports_2019 = re_export[['Country', '2019']].rename(columns={'2019': 'Reexports_2019'})
+    consumption_2019 = importers_consumption[['Country', '2019']].rename(columns={'2019': 'Consumption_2019'})
+
+    # Merge data
+    df = imports_2019.merge(reexports_2019, on='Country').merge(consumption_2019, on='Country')
+
+    # Calculate proportions
+    df['Reexport'] = df['Reexports_2019'] / df['Imports_2019']
+    df['Consumption'] = df['Consumption_2019'] / df['Imports_2019']
+
+    # Select top 10 importing countries by import volume in 2019
+    top_countries = df.nlargest(8, 'Imports_2019')['Country']
+    df_top = df[df['Country'].isin(top_countries)]
+
+    # Melt the dataframe for plotting
+    df_melted = df_top.melt(id_vars=['Country'], value_vars=['Reexport', 'Consumption'],
+                            var_name='Proportion Type', value_name='Proportion')
+
+    # Create the bar chart
+    fig = px.bar(df_melted, x='Country', y='Proportion', color='Proportion Type', barmode='group',
+                 title='Proportion of Re-exports vs Domestic Consumption for Top Importing Countries (2019)',
+                 labels={'Proportion': 'Proportion of Imports'},
+                color_discrete_map = {'Reexport Proportion': 'rgb(196, 12, 242)',
+                                        'Consumption Proportion': 'rgb(234, 111, 238)'})
+
+    fig.update_layout(xaxis_title='Country', yaxis_title='Proportion of Imports')
+
+    return fig
+
+
+def create_custom_tabs(tab_names):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button(tab_names[0], key=tab_names[0], use_container_width=True):
+            st.session_state.active_tab = tab_names[0]
+    with col2:
+        if st.button(tab_names[1], key=tab_names[1], use_container_width=True):
+            st.session_state.active_tab = tab_names[1]
+    with col3:
+        if st.button(tab_names[2], key=tab_names[2], use_container_width=True):
+            st.session_state.active_tab = tab_names[2]
+
+    st.markdown("""
+    <style>
+    div.stButton > button {
+        font-size: 24px;
+        font-weight: bold;
+        height: 3em;
+        border: 2px solid #4CAF50;
+        border-radius: 5px;
+    }
+    div.stButton > button:hover {
+        background-color: #4CAF50;
+        color: white;
+    }
+    div.stButton > button:focus:not(:active) {
+        background-color: #4CAF50;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+
 def create_interactive_trading_map(psd_coffee: pd.DataFrame, world: gpd.GeoDataFrame,
                                    year_range: Tuple[int, int]) -> px.choropleth:
     """Create an interactive choropleth map with clickable countries to show aggregated coffee trading data."""
@@ -814,74 +883,6 @@ def display_data(country: Optional[str], aggregated_data: pd.DataFrame):
         col3.metric("Total Exports", f"{world_data['Exports'].values[0]:,.0f}")
         col4.metric("Total Imports", f"{world_data['Imports'].values[0]:,.0f}")
         col5.metric("Total Domestic Consumption", f"{world_data['Domestic Consumption'].values[0]:,.0f}")
-
-
-def create_reexport_vs_domestic_chart(coffee_import: pd.DataFrame, re_export: pd.DataFrame, importers_consumption: pd.DataFrame) -> go.Figure:
-    """Create a bar chart showing the proportion of re-exports vs domestic consumption for top importing countries in 2019."""
-
-    # Filter for the year 2019
-    imports_2019 = coffee_import[['Country', '2019']].rename(columns={'2019': 'Imports_2019'})
-    reexports_2019 = re_export[['Country', '2019']].rename(columns={'2019': 'Reexports_2019'})
-    consumption_2019 = importers_consumption[['Country', '2019']].rename(columns={'2019': 'Consumption_2019'})
-
-    # Merge data
-    df = imports_2019.merge(reexports_2019, on='Country').merge(consumption_2019, on='Country')
-
-    # Calculate proportions
-    df['Reexport'] = df['Reexports_2019'] / df['Imports_2019']
-    df['Consumption'] = df['Consumption_2019'] / df['Imports_2019']
-
-    # Select top 10 importing countries by import volume in 2019
-    top_countries = df.nlargest(8, 'Imports_2019')['Country']
-    df_top = df[df['Country'].isin(top_countries)]
-
-    # Melt the dataframe for plotting
-    df_melted = df_top.melt(id_vars=['Country'], value_vars=['Reexport', 'Consumption'],
-                            var_name='Proportion Type', value_name='Proportion')
-
-    # Create the bar chart
-    fig = px.bar(df_melted, x='Country', y='Proportion', color='Proportion Type', barmode='group',
-                 title='Proportion of Re-exports vs Domestic Consumption for Top Importing Countries (2019)',
-                 labels={'Proportion': 'Proportion of Imports'},
-                color_discrete_map = {'Reexport Proportion': 'rgb(196, 12, 242)',
-                                        'Consumption Proportion': 'rgb(234, 111, 238)'})
-
-    fig.update_layout(xaxis_title='Country', yaxis_title='Proportion of Imports')
-
-    return fig
-
-
-def create_custom_tabs(tab_names):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button(tab_names[0], key=tab_names[0], use_container_width=True):
-            st.session_state.active_tab = tab_names[0]
-    with col2:
-        if st.button(tab_names[1], key=tab_names[1], use_container_width=True):
-            st.session_state.active_tab = tab_names[1]
-    with col3:
-        if st.button(tab_names[2], key=tab_names[2], use_container_width=True):
-            st.session_state.active_tab = tab_names[2]
-
-    st.markdown("""
-    <style>
-    div.stButton > button {
-        font-size: 24px;
-        font-weight: bold;
-        height: 3em;
-        border: 2px solid #4CAF50;
-        border-radius: 5px;
-    }
-    div.stButton > button:hover {
-        background-color: #4CAF50;
-        color: white;
-    }
-    div.stButton > button:focus:not(:active) {
-        background-color: #4CAF50;
-        color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 
 def main():
