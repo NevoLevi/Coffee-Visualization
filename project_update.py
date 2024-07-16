@@ -54,7 +54,7 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame,
 
 def create_top_producers_chart(psd_coffee: pd.DataFrame) -> go.Figure:
     """Create a line chart of top coffee producing countries."""
-    top_producers = psd_coffee.groupby('Country')['Production'].sum().nlargest(7).index
+    top_producers = psd_coffee.groupby('Country')['Production'].sum().nlargest(5).index
     top_producers_data = psd_coffee[psd_coffee['Country'].isin(top_producers)]
 
     return px.line(
@@ -62,7 +62,7 @@ def create_top_producers_chart(psd_coffee: pd.DataFrame) -> go.Figure:
         x='Year',
         y='Production',
         color='Country',
-        title="Top 7 Coffee Producing Countries (1960-2023)",
+        title="Top 5 Coffee Producing Countries (1960-2023)",
         labels={'Production': 'Production (60kg bags)'}
     )
 
@@ -103,7 +103,8 @@ def create_processing_quality_chart(arabica_clean: pd.DataFrame) -> go.Figure:
         color='Processing Method',
         title="Coffee Quality by Processing Method",
         labels={'Total Cup Points': 'Quality Score'},
-        category_orders={'Processing Method': methods}
+        category_orders={'Processing Method': methods},
+        points=False
     )
 
     fig.update_layout(showlegend=False)
@@ -165,7 +166,8 @@ def create_color_quality_chart(arabica_clean: pd.DataFrame):
         title="Coffee Quality by Bean Color",
         labels={'Total Cup Points': 'Quality Score'},
         category_orders={'Color Category': list(color_map.keys())},
-        color_discrete_map=color_map
+        color_discrete_map=color_map,
+        points=False
     )
 
     fig.update_layout(showlegend=False)
@@ -190,7 +192,7 @@ def create_flavor_profile_radar(arabica_clean: pd.DataFrame, countries: List[str
 
     # Filter data for selected countries
     selected_data = arabica_clean[arabica_clean['Country of Origin'].isin(countries)][
-        attributes + ['Country of Origin']]
+        attributes + ['Country of Origin', 'Total Cup Points']]
 
     # Define the new scaling range
     scale_min = 6
@@ -226,9 +228,98 @@ def create_flavor_profile_radar(arabica_clean: pd.DataFrame, countries: List[str
     return fig
 
 
+def create_parallel_coordinates_plot(arabica_clean: pd.DataFrame, countries: List[str]) -> go.Figure:
+    """Create a parallel coordinates plot of coffee flavor profiles by country."""
+    attributes = ['Aroma', 'Flavor', 'Aftertaste', 'Acidity', 'Body', 'Balance']
+
+    # Filter data for selected countries
+    selected_data = arabica_clean[arabica_clean['Country of Origin'].isin(countries)][
+        attributes + ['Country of Origin']]
+
+    fig = px.parallel_coordinates(selected_data, color="Country of Origin", dimensions=attributes,
+                                  color_discrete_sequence=px.colors.qualitative.Bold)
+
+    fig.update_layout(
+        title="Coffee Flavor Profiles by Country (Parallel Coordinates Plot)"
+    )
+
+    return fig
+
+
+def create_flavor_profile_bar_plot(arabica_clean: pd.DataFrame, country1: str, country2: str) -> go.Figure:
+    """Create a bar plot of coffee flavor profiles by country with dynamic scaling."""
+    attributes = ['Aroma', 'Flavor', 'Aftertaste', 'Acidity', 'Body', 'Balance']
+
+    # Filter data for the selected countries
+    selected_data = arabica_clean[arabica_clean['Country of Origin'].isin([country1, country2])]
+
+    # Calculate the dynamic scale based on the selected countries
+    min_value = selected_data[attributes].mean().min()
+    max_value = selected_data[attributes].mean().max()
+
+    fig = go.Figure()
+
+    for country in [country1, country2]:
+        country_data = selected_data[selected_data['Country of Origin'] == country][attributes].mean()
+        fig.add_trace(go.Bar(
+            x=attributes,
+            y=country_data.values,
+            name=country
+        ))
+
+    fig.update_layout(
+        title="Average Coffee Flavor Profile by Country",
+        xaxis_title="Attributes",
+        yaxis_title="Score",
+        yaxis=dict(range=[min_value - 0.5, max_value + 0.5]),
+        barmode='group'
+    )
+
+    return fig
+
+
+def display_total_cup_points(arabica_clean: pd.DataFrame, country1: str, country2: str):
+    """Display the average total cup points for the selected countries."""
+    selected_data = arabica_clean[arabica_clean['Country of Origin'].isin([country1, country2])]
+    avg_cup_points = selected_data.groupby('Country of Origin')['Total Cup Points'].mean()
+
+    st.markdown("<h4 style='text-align: center;'>Average Total Cup Points</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center;'>{country1}: {avg_cup_points[country1]:.2f}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center;'>{country2}: {avg_cup_points[country2]:.2f}</h3>", unsafe_allow_html=True)
+
+
+def create_reexport_pie_chart(coffee_import: pd.DataFrame, re_export: pd.DataFrame) -> go.Figure:
+    """Create a pie chart showing the proportion of re-exports to imports for major coffee trading countries."""
+    imports = coffee_import.copy()
+    imports.set_index('Country', inplace=True)
+    imports = imports.drop(columns=['Total_import'])
+    imports = imports.reset_index().melt(id_vars=['Country'], var_name='Year', value_name='Imports')
+
+    reexports = re_export.copy()
+    reexports.set_index('Country', inplace=True)
+    reexports = reexports.drop(columns=['Total_re_export'])
+    reexports = reexports.reset_index().melt(id_vars=['Country'], var_name='Year', value_name='Re-exports')
+
+    df = imports.merge(reexports, on=['Country', 'Year'], how='outer')
+    df['Year'] = pd.to_numeric(df['Year'])
+    df['Re-export Proportion'] = df['Re-exports'] / df['Imports']
+
+    # Select top 8 countries by total trade volume
+    top_countries = df.groupby('Country')[['Imports', 'Re-exports']].sum().sum(axis=1).nlargest(8).index
+    df_filtered = df[df['Country'].isin(top_countries)]
+
+    latest_year = df_filtered['Year'].max()
+    df_latest = df_filtered[df_filtered['Year'] == latest_year]
+
+    fig = px.pie(df_latest, names='Country', values='Re-export Proportion',
+                 title=f'Proportion of Re-exports to Imports for Major Coffee Trading Countries ({latest_year})',
+                 color='Country', color_discrete_sequence=px.colors.sequential.Viridis)
+
+    return fig
+
 def create_import_trends_chart(psd_coffee: pd.DataFrame, selected_countries: List[str],
                                all_countries: bool) -> go.Figure:
-    """Create a stacked area chart of coffee import trends by type."""
+    """Create a line chart of coffee import trends by type."""
     # Filter data for selected countries
     df = psd_coffee[psd_coffee['Country'].isin(selected_countries)]
 
@@ -239,28 +330,25 @@ def create_import_trends_chart(psd_coffee: pd.DataFrame, selected_countries: Lis
         'Soluble Imports': 'sum'
     }).reset_index()
 
-    # Create the stacked area chart
+    # Create the line chart
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
         x=df_grouped['Year'], y=df_grouped['Bean Imports'],
         mode='lines',
-        line=dict(width=0.5, color='rgb(131, 90, 241)'),
-        stackgroup='one',
+        line=dict(width=2, color='rgb(131, 90, 241)'),
         name='Green Coffee Beans'
     ))
     fig.add_trace(go.Scatter(
         x=df_grouped['Year'], y=df_grouped['Rst,Ground Dom. Consum'],
         mode='lines',
-        line=dict(width=0.5, color='rgb(111, 231, 219)'),
-        stackgroup='one',
+        line=dict(width=2, color='rgb(111, 231, 219)'),
         name='Roasted and Ground Coffee'
     ))
     fig.add_trace(go.Scatter(
         x=df_grouped['Year'], y=df_grouped['Soluble Imports'],
         mode='lines',
-        line=dict(width=0.5, color='rgb(255, 183, 77)'),
-        stackgroup='one',
+        line=dict(width=2, color='rgb(255, 183, 77)'),
         name='Soluble Coffee'
     ))
 
@@ -279,7 +367,6 @@ def create_import_trends_chart(psd_coffee: pd.DataFrame, selected_countries: Lis
     )
 
     return fig
-
 
 def create_multiline_chart(psd_coffee: pd.DataFrame, selected_countries: List[str]) -> go.Figure:
     """Create a multi-line chart with dual Y-axes for Arabica and Robusta production."""
@@ -755,6 +842,40 @@ def display_data(country: Optional[str], aggregated_data: pd.DataFrame):
         col5.metric("Total Domestic Consumption", f"{world_data['Domestic Consumption'].values[0]:,.0f}")
 
 
+def create_reexport_vs_domestic_chart(coffee_import: pd.DataFrame, re_export: pd.DataFrame, importers_consumption: pd.DataFrame) -> go.Figure:
+    """Create a bar chart showing the proportion of re-exports vs domestic consumption for top importing countries in 2019."""
+
+    # Filter for the year 2019
+    imports_2019 = coffee_import[['Country', '2019']].rename(columns={'2019': 'Imports_2019'})
+    reexports_2019 = re_export[['Country', '2019']].rename(columns={'2019': 'Reexports_2019'})
+    consumption_2019 = importers_consumption[['Country', '2019']].rename(columns={'2019': 'Consumption_2019'})
+
+    # Merge data
+    df = imports_2019.merge(reexports_2019, on='Country').merge(consumption_2019, on='Country')
+
+    # Calculate proportions
+    df['Reexport'] = df['Reexports_2019'] / df['Imports_2019']
+    df['Consumption'] = df['Consumption_2019'] / df['Imports_2019']
+
+    # Select top 10 importing countries by import volume in 2019
+    top_countries = df.nlargest(8, 'Imports_2019')['Country']
+    df_top = df[df['Country'].isin(top_countries)]
+
+    # Melt the dataframe for plotting
+    df_melted = df_top.melt(id_vars=['Country'], value_vars=['Reexport', 'Consumption'],
+                            var_name='Proportion Type', value_name='Proportion')
+
+    # Create the bar chart
+    fig = px.bar(df_melted, x='Country', y='Proportion', color='Proportion Type', barmode='group',
+                 title='Proportion of Re-exports vs Domestic Consumption for Top Importing Countries (2019)',
+                 labels={'Proportion': 'Proportion of Imports'},
+                color_discrete_map = {'Reexport Proportion': 'rgb(196, 12, 242)',
+                                        'Consumption Proportion': 'rgb(234, 111, 238)'})
+
+    fig.update_layout(xaxis_title='Country', yaxis_title='Proportion of Imports')
+
+    return fig
+
 
 def main():
     st.set_page_config(layout="wide")
@@ -851,13 +972,14 @@ def main():
             )
 
             all_countries = sorted(psd_coffee['Country'].unique())
-            default_countries = ['Vietnam', 'Colombia', 'Indonesia', 'Ethiopia']
+            default_countries = ['Vietnam', 'Indonesia']
             default_countries = [country for country in default_countries if country in all_countries]
 
             selected_countries = st.multiselect(
-                "Select countries to analyze",
+                "Select up to 3 countries to analyze",
                 options=all_countries,
                 default=default_countries,
+                max_selections=3,
                 key="countries_multiselect"
             )
 
@@ -897,25 +1019,6 @@ def main():
 
         with col4:
             subheader_with_tooltip(
-                "Global Coffee Consumption by Continent",
-                "This stacked area chart shows the proportion of global coffee consumption by continent over time. It helps to visualize shifts in global coffee consumption patterns and the relative importance of each continent in the global coffee market."
-            )
-            fig_continent_consumption = create_continent_consumption_area(psd_coffee)
-            fig_continent_consumption.update_layout(height=400)
-            st.plotly_chart(fig_continent_consumption, use_container_width=True)
-
-        col5, col6 = st.columns(2)
-
-        with col5:
-            subheader_with_tooltip(
-                "Coffee Consumption Trends for Top 7 Importing Countries",
-                "This line chart shows consumption trends over time for the top 7 coffee-importing countries. It allows for easy comparison of consumption patterns and growth rates among major coffee consumers."
-            )
-            fig_top_consumers = create_top_consumers_line_chart(importers_consumption)
-            st.plotly_chart(fig_top_consumers, use_container_width=True)
-
-        with col6:
-            subheader_with_tooltip(
                 "Global Coffee Consumption and Production Trends",
                 "This line chart shows global coffee consumption and production trends over time. It helps visualize how consumption and production have changed and how they relate to each other."
             )
@@ -934,10 +1037,10 @@ def main():
             )
             all_countries = sorted(arabica_clean['Country of Origin'].unique())
             selected_countries = st.multiselect(
-                "Select up to 10 countries to analyze",
+                "Select up to 5 countries to analyze",
                 options=all_countries,
-                default=all_countries[:5],
-                max_selections=10,
+                default=all_countries[:3],
+                max_selections=5,
                 key="arabica_countries_multiselect"
             )
             if selected_countries:
@@ -968,18 +1071,24 @@ def main():
         with col4:
             subheader_with_tooltip(
                 "Average Coffee Flavor Profile by Country",
-                "This radar chart shows the average flavor profile of coffee from selected countries. Each axis represents a different flavor attribute, and the chart allows for easy comparison of flavor profiles between countries."
+                "This bar chart shows the average flavor profile of coffee from selected countries. Each bar represents a different flavor attribute, and the chart allows for easy comparison of flavor profiles between countries."
             )
-            selected_countries_flavor = st.multiselect(
-                "Select countries to compare flavor profiles",
-                options=all_countries,
-                default=all_countries[:3],
-                key="flavor_profile_countries"
-            )
-            if selected_countries_flavor:
-                fig_flavor = create_flavor_profile_radar(arabica_clean, selected_countries_flavor)
-                fig_flavor.update_layout(height=400)
-                st.plotly_chart(fig_flavor, use_container_width=True)
+
+            country1 = st.selectbox("Select first country", options=all_countries, index=0, key="country1")
+            country2 = st.selectbox("Select second country", options=all_countries, index=1, key="country2")
+
+            if country1 and country2 and country1 != country2:
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    fig_flavor = create_flavor_profile_bar_plot(arabica_clean, country1, country2)
+                    fig_flavor.update_layout(height=400)
+                    st.plotly_chart(fig_flavor, use_container_width=True)
+
+                with col2:
+                    display_total_cup_points(arabica_clean, country1, country2)
+            else:
+                st.write("Please select two different countries to compare.")
 
     with tabs[2]:  # Compare and Explore
         st.header("Compare and Explore")
@@ -987,11 +1096,12 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             subheader_with_tooltip(
-                "Proportion of Re-exports to Imports for Major Coffee Trading Countries",
-                "This bar chart shows the ratio of re-exports to imports for major coffee trading countries. A higher ratio indicates that a larger portion of imported coffee is re-exported."
+                "Re-exports vs Domestic Consumption for Major Coffee Trading Countries",
+                "This bar chart shows the re-exports and domestic consumption for major coffee trading countries side by side. It helps to understand how much imported coffee is consumed domestically versus re-exported."
             )
-            fig_reexport_proportion = create_reexport_proportion_chart(coffee_import, re_export)
-            st.plotly_chart(fig_reexport_proportion, use_container_width=True)
+            fig_reexport_vs_domestic = create_reexport_vs_domestic_chart(coffee_import, re_export,
+                                                                         importers_consumption)
+            st.plotly_chart(fig_reexport_vs_domestic, use_container_width=True)
 
         with col2:
             subheader_with_tooltip(
