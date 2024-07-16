@@ -917,7 +917,7 @@ def main():
     st.title("Global Coffee Trends: From Bean to Cup")
     st.markdown(
         """
-        <div style="font-size: 26px;">
+        <div style="font-size: 22px;">
         <strong>Global Coffee Trends: From Bean to Cup</strong><br>
         Dive into the world of coffee with our interactive dashboard. Explore how production, consumption, and quality intertwine across the globe. Uncover surprising patterns in coffee preferences, from the impact of bean color on flavor to the shifting tides of imports and exports. Whether you're a casual sipper or a coffee connoisseur, this data-driven journey will give you a fresh perspective on your daily brew.
         </div>
@@ -925,7 +925,7 @@ def main():
     )
 
     # Display the image
-    st.image("coffee_image_best_final.png", use_column_width=True)
+    st.image("coffee_image_best_new_final.png", width=800)
 
     # Load data
     psd_coffee, arabica_clean, importers_consumption, re_export, domestic_consumption, coffee_import, world, population = load_data()
@@ -940,7 +940,7 @@ def main():
     # Display content based on active tab
     if st.session_state.active_tab == "Trends":
         st.header("Trends")
-        # Add content for Trends tab
+
         year_range = st.slider("Select Year Range", min_value=1960, max_value=2023, value=(1960, 2023),
                                key="year_range_slider")
 
@@ -969,19 +969,35 @@ def main():
         eu_aggregated['name'] = 'European Union'
         aggregated_data = pd.concat([aggregated_data, eu_aggregated], ignore_index=True)
 
+        # Initialize the session state for selected country if not already done
+        if 'selected_country' not in st.session_state:
+            st.session_state.selected_country = None
+
+        # Create a placeholder for the country data display
+        country_data_placeholder = st.empty()
+
+        # Function to update the displayed data
+        def update_display():
+            with country_data_placeholder:
+                display_data(st.session_state.selected_country, aggregated_data)
+
+        # Button to clear the country selection and show world data
+        if st.button("Show World Data"):
+            st.session_state.selected_country = None
+            st.rerun()  # Full rerun when the button is clicked
+
+        # Initial display of data
+        update_display()
+
         # Add a tooltip to the map section
         subheader_with_tooltip(
             "Interactive Coffee Trading Map",
             "This interactive map displays coffee trading data for selected years. "
             "Trading is Exports + Imports of the country. Click on a country to view its details. "
-            "To reset the map to its initial state,  click again on the last selected country, or adjust the year range slider."
+            "To reset the map to its initial state, click again on the last selected country, or adjust the year range slider."
         )
 
-        # Initialize the session state for selected country
-        if 'selected_country' not in st.session_state:
-            st.session_state.selected_country = None
-
-        # Update selected country based on map click
+        # Create and display the interactive map
         fig = create_interactive_trading_map(psd_coffee, world, year_range)
         selected_point = plotly_events(fig, click_event=True)
 
@@ -989,21 +1005,18 @@ def main():
             try:
                 if 'customdata' in selected_point[0]:
                     # EU dot was clicked
-                    st.session_state.selected_country = selected_point[0]['customdata']['name']
+                    selected_country = selected_point[0]['customdata']['name']
                 else:
                     # Country on the map was clicked
                     point_number = selected_point[0]["pointNumber"]
-                    country_name = world.iloc[point_number]["name"]
-                    st.session_state.selected_country = country_name
+                    selected_country = world.iloc[point_number]["name"]
+
+                if st.session_state.selected_country != selected_country:
+                    st.session_state.selected_country = selected_country
+                    update_display()  # Update the displayed data without rerunning the app
             except (KeyError, IndexError) as e:
                 st.error(f"Error: {e}. Event data: {selected_point}")
 
-        # Button to clear the country selection and show world data
-        if st.button("Show World Data"):
-            st.session_state.selected_country = None
-
-        # Display the data for the selected country or the world if no country is selected
-        display_data(st.session_state.selected_country, aggregated_data)
 
         # Two columns for the remaining charts
         col1, col2 = st.columns(2)
