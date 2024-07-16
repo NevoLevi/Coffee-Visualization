@@ -641,9 +641,10 @@ def create_consumption_production_bubble_top10(domestic_consumption: pd.DataFram
     return fig
 
 
-def create_consumption_production_trend_psd(psd_coffee: pd.DataFrame) -> go.Figure:
+def create_consumption_production_trend_psd(psd_coffee: pd.DataFrame, selected_countries: List[str]) -> go.Figure:
     """Create a line chart with dual y-axes showing domestic consumption trends and production fluctuations over time using PSD coffee data."""
-    df = psd_coffee.groupby('Year').agg({
+    filtered_data = psd_coffee[psd_coffee['Country'].isin(selected_countries)]
+    df = filtered_data.groupby('Year').agg({
         'Domestic Consumption': 'sum',
         'Arabica Production': 'sum',
         'Robusta Production': 'sum'
@@ -653,12 +654,12 @@ def create_consumption_production_trend_psd(psd_coffee: pd.DataFrame) -> go.Figu
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    fig.add_trace(go.Scatter(x=df['Year'], y=df['Domestic Consumption'], name='Global Consumption'),
+    fig.add_trace(go.Scatter(x=df['Year'], y=df['Domestic Consumption'], name='Consumption'),
                   secondary_y=False)
-    fig.add_trace(go.Scatter(x=df['Year'], y=df['Total Production'], name='Global Production'),
+    fig.add_trace(go.Scatter(x=df['Year'], y=df['Total Production'], name='Production'),
                   secondary_y=False)
 
-    fig.update_layout(title='Global Coffee Consumption and Production Trends',
+    fig.update_layout(title='Coffee Consumption and Production Trends',
                       xaxis_title='Year')
     fig.update_yaxes(title_text="Coffee (60kg bags)", secondary_y=False)
 
@@ -877,21 +878,71 @@ def create_reexport_vs_domestic_chart(coffee_import: pd.DataFrame, re_export: pd
     return fig
 
 
+def create_custom_tabs(tab_names):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button(tab_names[0], key=tab_names[0], use_container_width=True):
+            st.session_state.active_tab = tab_names[0]
+    with col2:
+        if st.button(tab_names[1], key=tab_names[1], use_container_width=True):
+            st.session_state.active_tab = tab_names[1]
+    with col3:
+        if st.button(tab_names[2], key=tab_names[2], use_container_width=True):
+            st.session_state.active_tab = tab_names[2]
+
+    st.markdown("""
+    <style>
+    div.stButton > button {
+        font-size: 24px;
+        font-weight: bold;
+        height: 3em;
+        border: 2px solid #4CAF50;
+        border-radius: 5px;
+    }
+    div.stButton > button:hover {
+        background-color: #4CAF50;
+        color: white;
+    }
+    div.stButton > button:focus:not(:active) {
+        background-color: #4CAF50;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def main():
     st.set_page_config(layout="wide")
-    st.title("Coffee Production and Consumption Dashboard")
+
+    st.title("Global Coffee Trends: From Bean to Cup")
+    st.markdown(
+        """
+        <div style="font-size: 26px;">
+        <strong>Global Coffee Trends: From Bean to Cup</strong><br>
+        Dive into the world of coffee with our interactive dashboard. Explore how production, consumption, and quality intertwine across the globe. Uncover surprising patterns in coffee preferences, from the impact of bean color on flavor to the shifting tides of imports and exports. Whether you're a casual sipper or a coffee connoisseur, this data-driven journey will give you a fresh perspective on your daily brew.
+        </div>
+        """, unsafe_allow_html=True
+    )
+
+    # Display the image
+    st.image("coffee_image_best_final.png", use_column_width=True)
 
     # Load data
     psd_coffee, arabica_clean, importers_consumption, re_export, domestic_consumption, coffee_import, world, population = load_data()
 
-    # Create tabs for different datasets
-    tabs = st.tabs(
-        ["Trends", "Arabica Coffee Quality", "Compare and Explore"])
+    # Create custom tabs
+    tab_names = ["Trends", "Arabica Coffee Quality", "Compare and Explore"]
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = tab_names[0]
 
-    with tabs[0]:  # Trends
-        st.header("Global Coffee Trading Trends")
+    create_custom_tabs(tab_names)
 
-        year_range = st.slider("Select Year Range", min_value=1960, max_value=2023, value=(1960, 2023), key="year_range_slider")
+    # Display content based on active tab
+    if st.session_state.active_tab == "Trends":
+        st.header("Trends")
+        # Add content for Trends tab
+        year_range = st.slider("Select Year Range", min_value=1960, max_value=2023, value=(1960, 2023),
+                               key="year_range_slider")
 
         # Aggregate data for all countries based on the selected year range
         trading_data = psd_coffee[(psd_coffee['Year'] >= year_range[0]) & (psd_coffee['Year'] <= year_range[1])]
@@ -904,7 +955,8 @@ def main():
 
         # Ensure all countries are included
         world['name'] = world['name'].str.strip()
-        aggregated_data = world[['name']].merge(aggregated_data, how='left', left_on='name', right_on='Country').fillna(0)
+        aggregated_data = world[['name']].merge(aggregated_data, how='left', left_on='name', right_on='Country').fillna(
+            0)
 
         # Add European Union data to the aggregated dataset
         eu_data = psd_coffee[psd_coffee['Country'] == 'European Union']
@@ -996,7 +1048,7 @@ def main():
         with col3:
             subheader_with_tooltip(
                 "Coffee Import Trends by Type",
-                "This stacked area chart shows import trends for different types of coffee over time. It can reveal changes in global coffee preferences, trade patterns, and processing trends."
+                "This line chart shows import trends for different types of coffee over time. It can reveal changes in global coffee preferences, trade patterns, and processing trends."
             )
             all_countries = st.checkbox("Select All Countries", value=True, key="all_countries_checkbox")
             all_country_options = sorted(psd_coffee['Country'].unique())
@@ -1020,20 +1072,38 @@ def main():
         with col4:
             subheader_with_tooltip(
                 "Global Coffee Consumption and Production Trends",
-                "This line chart shows global coffee consumption and production trends over time. It helps visualize how consumption and production have changed and how they relate to each other."
+                "This line chart shows global coffee consumption and production trends over time. It helps visualize how consumption and production have changed and how they relate to each other. You may select specific countries by ticking off 'Select All Countries'"
             )
-            fig_consumption_production_trend = create_consumption_production_trend_psd(psd_coffee)
-            st.plotly_chart(fig_consumption_production_trend, use_container_width=True)
 
+            # Add the checkbox and multiselect for the 4th graph
+            all_countries_4 = st.checkbox("Select All Countries", value=True,
+                                          key="all_countries_checkbox_4")
+            all_country_options_4 = sorted(psd_coffee['Country'].unique())
+            default_countries_4 = ['Brazil', 'Vietnam', 'Colombia', 'Indonesia', 'Ethiopia']
+            default_countries_4 = [country for country in default_countries_4 if country in all_country_options_4]
 
-    with tabs[1]:  # Arabica Coffee Quality
-        st.header("Arabica Coffee Quality Analysis")
+            if not all_countries_4:
+                selected_countries_4 = st.multiselect(
+                    "Select specific countries to analyze for Production vs Consumption",
+                    options=all_country_options_4,
+                    default=default_countries_4,
+                    key="countries_multiselect_production_consumption"
+                )
+            else:
+                selected_countries_4 = all_country_options_4
 
+            if selected_countries_4:
+                fig_consumption_production_trend = create_consumption_production_trend_psd(psd_coffee,
+                                                                                           selected_countries_4)
+                st.plotly_chart(fig_consumption_production_trend, use_container_width=True)
+    elif st.session_state.active_tab == "Arabica Coffee Quality":
+        st.header("Arabica Coffee Quality")
+        # Add content for Arabica Coffee Quality tab
         col1, col2 = st.columns(2)
         with col1:
             subheader_with_tooltip(
                 "Altitude vs. Coffee Quality",
-                "This scatter plot shows the relationship between altitude and coffee quality. Generally, higher altitudes are associated with better quality coffee due to slower growth and more concentrated flavors. Look for patterns or clusters in the data."
+                "This scatter plot shows the relationship between altitude and coffee quality. Generally, higher altitudes are associated with better quality coffee due to slower growth and more concentrated flavors. Look for patterns or clusters in the data.  You may select specific countries by ticking off 'Select All Countries'"
             )
             all_countries = sorted(arabica_clean['Country of Origin'].unique())
             selected_countries = st.multiselect(
@@ -1090,9 +1160,9 @@ def main():
             else:
                 st.write("Please select two different countries to compare.")
 
-    with tabs[2]:  # Compare and Explore
+    elif st.session_state.active_tab == "Compare and Explore":
         st.header("Compare and Explore")
-
+        # Add content for Compare and Explore tab
         col1, col2 = st.columns(2)
         with col1:
             subheader_with_tooltip(
@@ -1119,7 +1189,6 @@ def main():
         fig_coffee_type_map = create_coffee_type_map(domestic_consumption, world)
         st.plotly_chart(fig_coffee_type_map, use_container_width=True)
 
-
         subheader_with_tooltip(
             "Top 10 Countries: Production vs Domestic Consumption",
             "This bubble chart compares coffee production and domestic consumption for the top 10 coffee-consuming countries. The size of each bubble represents the country's coffee exports."
@@ -1127,8 +1196,6 @@ def main():
         fig_consumption_production = create_consumption_production_bubble_top10(domestic_consumption,
                                                                                 psd_coffee)
         st.plotly_chart(fig_consumption_production, use_container_width=True)
-
-
 
 if __name__ == "__main__":
     main()
