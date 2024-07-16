@@ -288,35 +288,6 @@ def display_total_cup_points(arabica_clean: pd.DataFrame, country1: str, country
     st.markdown(f"<h3 style='text-align: center;'>{country2}: {avg_cup_points[country2]:.2f}</h3>", unsafe_allow_html=True)
 
 
-def create_reexport_pie_chart(coffee_import: pd.DataFrame, re_export: pd.DataFrame) -> go.Figure:
-    """Create a pie chart showing the proportion of re-exports to imports for major coffee trading countries."""
-    imports = coffee_import.copy()
-    imports.set_index('Country', inplace=True)
-    imports = imports.drop(columns=['Total_import'])
-    imports = imports.reset_index().melt(id_vars=['Country'], var_name='Year', value_name='Imports')
-
-    reexports = re_export.copy()
-    reexports.set_index('Country', inplace=True)
-    reexports = reexports.drop(columns=['Total_re_export'])
-    reexports = reexports.reset_index().melt(id_vars=['Country'], var_name='Year', value_name='Re-exports')
-
-    df = imports.merge(reexports, on=['Country', 'Year'], how='outer')
-    df['Year'] = pd.to_numeric(df['Year'])
-    df['Re-export Proportion'] = df['Re-exports'] / df['Imports']
-
-    # Select top 8 countries by total trade volume
-    top_countries = df.groupby('Country')[['Imports', 'Re-exports']].sum().sum(axis=1).nlargest(8).index
-    df_filtered = df[df['Country'].isin(top_countries)]
-
-    latest_year = df_filtered['Year'].max()
-    df_latest = df_filtered[df_filtered['Year'] == latest_year]
-
-    fig = px.pie(df_latest, names='Country', values='Re-export Proportion',
-                 title=f'Proportion of Re-exports to Imports for Major Coffee Trading Countries ({latest_year})',
-                 color='Country', color_discrete_sequence=px.colors.sequential.Viridis)
-
-    return fig
-
 def create_import_trends_chart(psd_coffee: pd.DataFrame, selected_countries: List[str],
                                all_countries: bool) -> go.Figure:
     """Create a line chart of coffee import trends by type."""
@@ -791,9 +762,11 @@ def create_interactive_trading_map(psd_coffee: pd.DataFrame, world: gpd.GeoDataF
             tickvals=tick_vals,
             ticktext=tick_text,
             xanchor="left",  # Fix the color bar position
-            x=1.02,  # Position the color bar just outside the map
+            x=0.9,  # Position the color bar inside the map
+            y=0.5,
+            yanchor="middle",
             lenmode="fraction",
-            len=0.75  # Adjust the length of the color bar
+            len=0.5  # Adjust the length of the color bar
         )
     )
 
@@ -917,10 +890,20 @@ def main():
     st.title("Global Coffee Trends: From Bean to Cup")
     st.markdown(
         """
-        <div style="font-size: 22px;">
-        <strong>Global Coffee Trends: From Bean to Cup</strong><br>
+        <div style="font-size: 24px;">
         Dive into the world of coffee with our interactive dashboard. Explore how production, consumption, and quality intertwine across the globe. Uncover surprising patterns in coffee preferences, from the impact of bean color on flavor to the shifting tides of imports and exports. Whether you're a casual sipper or a coffee connoisseur, this data-driven journey will give you a fresh perspective on your daily brew.
         </div>
+        """, unsafe_allow_html=True
+    )
+
+    # Add CSS for dynamic width of the map container
+    st.markdown(
+        """
+        <style>
+        .map-container {
+            width: 100%;
+        }
+        </style>
         """, unsafe_allow_html=True
     )
 
@@ -941,8 +924,7 @@ def main():
     if st.session_state.active_tab == "Trends":
         st.header("Trends")
 
-        year_range = st.slider("Select Year Range", min_value=1960, max_value=2023, value=(1960, 2023),
-                               key="year_range_slider")
+        year_range = st.slider("Select Year Range", min_value=1960, max_value=2023, value=(1960, 2023), key="year_range_slider")
 
         # Aggregate data for all countries based on the selected year range
         trading_data = psd_coffee[(psd_coffee['Year'] >= year_range[0]) & (psd_coffee['Year'] <= year_range[1])]
@@ -955,8 +937,7 @@ def main():
 
         # Ensure all countries are included
         world['name'] = world['name'].str.strip()
-        aggregated_data = world[['name']].merge(aggregated_data, how='left', left_on='name', right_on='Country').fillna(
-            0)
+        aggregated_data = world[['name']].merge(aggregated_data, how='left', left_on='name', right_on='Country').fillna(0)
 
         # Add European Union data to the aggregated dataset
         eu_data = psd_coffee[psd_coffee['Country'] == 'European Union']
@@ -984,7 +965,7 @@ def main():
         # Button to clear the country selection and show world data
         if st.button("Show World Data"):
             st.session_state.selected_country = None
-            st.rerun()  # Full rerun when the button is clicked
+            st.experimental_rerun()  # Full rerun when the button is clicked
 
         # Initial display of data
         update_display()
